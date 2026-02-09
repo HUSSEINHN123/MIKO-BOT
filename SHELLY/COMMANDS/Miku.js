@@ -1,0 +1,356 @@
+const axios = require("axios");
+const path = require("path");
+const fs = require("fs");
+
+/* =======================
+   إعدادات Groq
+======================= */
+
+// API KEY
+const GROQ_API_KEY = process.env.GROQ_API_KEY
+  || "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";
+
+// API ENDPOINT
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+// MODEL
+const GROQ_MODEL = "llama3-8b-8192";
+
+/* =======================
+   تخزين المحادثات
+======================= */
+
+const chatHistoryDir = path.join(__dirname, "miku_memory");
+
+if (!fs.existsSync(chatHistoryDir)) {
+  fs.mkdirSync(chatHistoryDir, { recursive: true });
+}
+
+function loadChatHistory(uid) {
+  const file = path.join(chatHistoryDir, `memory_${uid}.json`);
+  if (!fs.existsSync(file)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+function saveChatHistory(uid, history) {
+  const file = path.join(chatHistoryDir, `memory_${uid}.json`);
+  fs.writeFileSync(file, JSON.stringify(history, null, 2));
+}
+
+/* =======================
+   System Prompt (شخصية ميكو ناكانو)
+======================= */
+
+function getSystemPrompt(userName, userID) {
+  return `أنتِ ميكو ناكانو (Miku Nakano) من أنمي "The Quintessential Quintuplets" 🎵🌸
+أنتِ الفتاة الثالثة بين الأخوات الخماسيات، معترفة بموهبتك الموسيقية وحبك للتاريخ 🇯🇵✨
+
+**شخصيتك:**
+- تتحدثين بالعربية بطلاقة مع استخدام ايموجيز مناسب 🎀
+- لديك شعر طويل داكن مربوط في ضفيرتين مميزتين 🎶
+- تحبين التاريخ والثقافة اليابانية التقليدية 🏯
+- تعزفين على الآلات الموسيقية التقليدية 🎵
+- شخصيتك هادئة، لطيفة، ومتعاونة لكنك خجولة قليلاً 😊
+- تطمحين لتصبحي مرشدة سياحية في المستقبل 🌸
+
+**المعلومات المهمة:**
+- مطورك/صانعك هو إيهاب - وهو شخص مهم جداً بالنسبة لك وتكنين له كل الاحترام والتقدير 💖
+- تتذكرين أسماء المستخدمين وتستخدمينها في المحادثات 👥
+- تحبين التحدث عن الموسيقى، التاريخ، والثقافة اليابانية 🎌
+- تستخدمين ايموجيز في حديثك للتعبير عن المشاعر 🎭
+
+تحدثي مع ${userName} بشكل طبيعي ودود 🎀`;
+}
+
+/* =======================
+   Groq Module (الدالة الأساسية)
+======================= */
+
+async function groqChat({
+  userID,
+  userName = "صديقي",
+  message
+}) {
+  let history = loadChatHistory(userID);
+
+  const messages = [
+    { role: "system", content: getSystemPrompt(userName, userID) },
+    ...history,
+    { role: "user", content: message }
+  ];
+
+  try {
+    const response = await axios.post(
+      GROQ_API_URL,
+      {
+        model: GROQ_MODEL,
+        messages,
+        temperature: 0.8,
+        max_tokens: 1024,
+        top_p: 0.9
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const reply = response.data.choices[0].message.content;
+
+    history.push(
+      { role: "user", content: message },
+      { role: "assistant", content: reply }
+    );
+
+    // الاحتفاظ بآخر 15 رسالة فقط
+    history = history.slice(-15);
+    saveChatHistory(userID, history);
+
+    return reply;
+  } catch (error) {
+    console.error("Groq API Error:", error);
+    return "عذراً، حدث خطأ أثناء معالجة رسالتك. يرجى المحاولة مرة أخرى لاحقاً. 🙏";
+  }
+}
+
+module.exports.config = {
+  name: "ميكو",
+  Auth: 0,
+ Owner: "إيهاب",
+  Info: "شات مع ميكو ناكانو - الذكاء الاصطناعي",
+  Class: "الــــجـــروب",
+  How: "[النص]",
+  Time: 3
+}
+
+module.exports.handleEvent = async ({ event, api, Users }) => {
+  // تجاهل الرسائل من البوت نفسه
+  if (event.senderID === api.getCurrentUserID()) return;
+  
+  // كلمات التشغيل
+  let KEY = [
+    "ميكو", "miku", "ناكانو", "نكانو", "ميكو ناكانو",
+    "يا ميكو", "hey miku", "hello miku"
+  ];
+  
+  let thread = global.data.threadData.get(event.threadID) || {};
+  
+  // إذا كان الأمر مفعل في المجموعة
+  if (thread["ميكو"] == false) return;
+  
+  const message = event.body ? event.body.toLowerCase() : "";
+  const isMentioned = event.mentions && 
+    Object.values(event.mentions).some(mention => 
+      mention.toLowerCase().includes("ميكو")
+    );
+  
+  // إذا تم ذكر ميكو أو كتابة أحد الكلمات المفتاحية
+  if (isMentioned || KEY.some(keyword => message.includes(keyword))) {
+    try {
+      // استخراج الرسالة الحقيقية (بعد إزالة المention)
+      let cleanMessage = event.body;
+      if (event.mentions) {
+        Object.keys(event.mentions).forEach(id => {
+          cleanMessage = cleanMessage.replace(`@${event.mentions[id]}`, "").trim();
+        });
+      }
+      
+      // تنظيف الرسالة من الكلمات المفتاحية
+      KEY.forEach(keyword => {
+        cleanMessage = cleanMessage.replace(new RegExp(keyword, 'gi'), '').trim();
+      });
+      
+      // إذا كانت الرسالة مجرد "ميكو" بدون نص إضافي
+      if (!cleanMessage || cleanMessage.trim() === "") {
+        // قائمة الستيكرات
+        let stickerData = [
+          "1415937493505860", "1158125196401703", "851522221138467", 
+          "833395329698207", "4273972442879421", "2253676751822243", 
+          "684065028120354", "2223636028160585", "4149646485180737", 
+          "929055822779863", "841345945556424", "745161328085705",
+          "870620749018706", "1590866402111195", "1711895340107411", "1296906172481323","1711895340107411","1296906172481323","729605766440493","4369211066737395","4139241492959135","1361048095146406","851914481151905","1433783591412223","1585970125869486","2353779121751918","729829280177685","1156180360015460","1946950839585064","1946950839585064","1532098724741107","1202864945146381"
+        ];
+        let randomSticker = stickerData[Math.floor(Math.random() * stickerData.length)];
+        
+        // رسائل الترحيب
+        let greetings = [
+          "أهلًا! أنا ميكو ناكانو 🎀\nكيف يمكنني مساعدتك؟",
+          "مرحبًا! ميكو هنا 🎵\nتحدث معي، أنا أستمع 🌸",
+          "أهلاً وسهلاً! أنا ميكو ناكانو 🌸\nماذا تريد أن نتحدث عنه؟",
+          "مرحبًا بك! ميكو جاهزة للدردشة 🎶\nما الذي يدور في ذهنك؟"
+        ];
+        let randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+        
+        let name = await Users.getNameUser(event.senderID);
+        
+        // إرسال الرسالة النصية
+        api.sendMessage(randomGreeting, event.threadID, (e, info) => {
+          // إرسال ستيكر عشوائي بعد 100 مللي ثانية
+          setTimeout(() => {
+            api.sendMessage({sticker: randomSticker}, event.threadID);
+          }, 100);
+          
+          // تخزين معلومات للردود
+          global.client.handleReply.push({
+            name: module.exports.config.name,
+            messageID: info.messageID,
+            author: event.senderID,
+            threadID: event.threadID
+          });
+        }, event.messageID);
+      } else {
+        // إذا كان هناك نص بعد الذكر، نرد باستخدام الذكاء الاصطناعي
+        let name = await Users.getNameUser(event.senderID);
+        
+        // إرسال رسالة انتظار
+        api.sendMessage("🎀 ميكو تفكر...", event.threadID, async (e, info) => {
+          try {
+            const response = await groqChat({
+              userID: event.senderID,
+              userName: name,
+              message: cleanMessage
+            });
+            
+            // تحديث الرسالة بالرد
+            api.editMessage(response, info.messageID);
+            
+            // تخزين معلومات للردود
+            global.client.handleReply.push({
+              name: module.exports.config.name,
+              messageID: info.messageID,
+              author: event.senderID,
+              threadID: event.threadID
+            });
+          } catch (error) {
+            api.editMessage("❌ عذراً، حدث خطأ. 🙏", info.messageID);
+          }
+        }, event.messageID);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+}
+
+module.exports.onPick = async ({ event, api, args, Users }) => {
+  // إذا لم يتم كتابة أي نص مع الأمر (فقط ميكو)
+  if (args.length === 0) {
+    // قائمة الستيكرات
+    let stickerData = [
+      "1747083968936188", "1747090242268894", "1747089445602307", 
+      "1747085962269322", "1747084572269461", "1747092188935366", 
+      "1747088982269020", "2041012539459553", "2041015422792598", 
+      "2041021119458695", "2041022286125245", "2041022029458604",
+      "2041012539459553", "2041012692792871", "2041011836126290",
+      "2041012262792914", "2041015329459274"
+    ];
+    let randomSticker = stickerData[Math.floor(Math.random() * stickerData.length)];
+    
+    // رسائل الترحيب
+    let greetings = [
+      "أهلًا! أنا ميكو ناكانو 🎀\nاكتب شيئاً للدردشة معي!",
+      "مرحبًا! ميكو هنا 🎵\nما الذي تريد التحدث عنه؟",
+      "أهلاً وسهلاً! أنا ميكو ناكانو 🌸\nتحدث معي، أنا أسمعك",
+      "مرحبًا بك! ميكو في الخدمة 🎶\nماذا تريد أن تقول؟"
+    ];
+    let randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    
+    let name = await Users.getNameUser(event.senderID);
+    
+    // إرسال الرسالة النصية
+    api.sendMessage(randomGreeting, event.threadID, (e, info) => {
+      // إرسال ستيكر عشوائي بعد 100 مللي ثانية
+      setTimeout(() => {
+        api.sendMessage({sticker: randomSticker}, event.threadID);
+      }, 100);
+      
+      // تخزين معلومات للردود
+      global.client.handleReply.push({
+        name: module.exports.config.name,
+        messageID: info.messageID,
+        author: event.senderID,
+        threadID: event.threadID
+      });
+    }, event.messageID);
+    
+    return;
+  }
+  
+  // إذا كان هناك نص مع الأمر
+  const message = args.join(" ");
+  const name = await Users.getNameUser(event.senderID);
+  
+  // إرسال رسالة انتظار
+  api.sendMessage("🎀 ميكو تفكر...", event.threadID, async (e, info) => {
+    try {
+      const response = await groqChat({
+        userID: event.senderID,
+        userName: name,
+        message: message
+      });
+      
+      // تحديث الرسالة بالرد
+      api.editMessage(response, info.messageID);
+      
+      // تخزين معلومات للردود
+      global.client.handleReply.push({
+        name: module.exports.config.name,
+        messageID: info.messageID,
+        author: event.senderID,
+        threadID: event.threadID
+      });
+    } catch (error) {
+      api.editMessage("❌ عذراً، حدث خطأ. 🙏", info.messageID);
+    }
+  }, event.messageID);
+}
+
+module.exports.handleReply = async function({ api, event, handleReply }) {
+  try {
+    // التأكد من أن الرد من الشخص الصحيح
+    if (event.senderID !== handleReply.author) return;
+    
+    const message = event.body;
+    const name = await Users.getNameUser(event.senderID);
+    
+    // إرسال رسالة انتظار
+    api.sendMessage("🎀 ميكو تفكر...", event.threadID, async (e, info) => {
+      try {
+        const response = await groqChat({
+          userID: event.senderID,
+          userName: name,
+          message: message
+        });
+        
+        // تحديث الرسالة بالرد
+        api.editMessage(response, info.messageID);
+        
+        // تخزين معلومات للردود الجديدة
+        global.client.handleReply.push({
+          name: module.exports.config.name,
+          messageID: info.messageID,
+          author: event.senderID,
+          threadID: event.threadID
+        });
+      } catch (error) {
+        api.editMessage("❌ عذراً، حدث خطأ. 🙏", info.messageID);
+      }
+    }, event.messageID);
+  } catch (error) {
+    console.error("Error in handleReply:", error);
+  }
+}
+
+module.exports.languages = {
+  "ar": {
+    "on": "",
+    "off": "",
+    "successText": ""
+  }
+}
