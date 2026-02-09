@@ -53,19 +53,19 @@ module.exports.onPick = async function ({ threadsData, usersData, event, sh: Mes
     let counter = 1;
     entries.forEach(([className, namesArray], index) => {
       if (namesArray.length > 0) {
-        msg += `✦━━━✥❖✥━━━✦\n╮━═━═━═━═━━╭\n\n  ❖ ${className} ❖\n\n╯━═━═━═━═━━╰\n━━━✦━━━\n`;
+        msg += `✦━━━✥❖✥━━━✦\n\n ❖ ${className} ❖ \n\n✦━━━✥❖✥━━━✦\n`;
         namesArray.forEach((cmdName) => {
           msg += `➥ ${counter} 👑 ${cmdName}\n`;
           counter++;
         });
         if (index < entries.length - 1) {
-          msg += `══• •✠•❀•✠• •════\n\n`;
+          msg += `══• •✠•❀•✠• •══\n\n`;
         }
       }
     });
 
     const siu = `✦━━━✥❖✥━━━✦\n      『قائمة الاوامر』`;
-    const text = `\n══• •✠•❀•✠• •════\nعدد الاوامر: ${arrayInfo.length}\n`;
+    const text = `\n══• •✠•❀•✠• •══\nعدد الاوامر: ${arrayInfo.length}\n`;
 
     let hello = siu + "\n\n" + msg + text;
     return Message.reply({
@@ -76,13 +76,8 @@ module.exports.onPick = async function ({ threadsData, usersData, event, sh: Mes
   const infos = command;
 
   const msg = `
-✦━━━✥❖✥━━━✦
-╮━═━═━═━═━━╭
-
+━━━━✦━━━━
     معلومات الأمر
-
-╯━═━═━═━═━━╰
-━━━✦━━━
 
 ➥ اسم الأمر: ${infos.config.name}
 ➥ الوصف: ${infos.config.Info || "مافي وصف"}
@@ -90,8 +85,7 @@ module.exports.onPick = async function ({ threadsData, usersData, event, sh: Mes
 ➥ الصانع: ${infos.config.Owner || "حمودي"}
 ➥ التصنيف: ${infos.config.Class || "أدوات"}
 ➥ كيفية الاستعمال: ${infos.config.How || "غير متوفر"}
-
-══• •✠•❀•✠• •════
+━━━━✦━━━━
   `;
   return Message.reply({ body: msg });
 };
