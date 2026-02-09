@@ -6,10 +6,10 @@ class CommandBuilder {
         this.loader();
     }
     loader() {
-        const COMMANDS = fs.readdirSync(global.shelly.mainPath + '/SHELLY/COMMANDS').filter(COMMAND => COMMAND.endsWith('.js'));
+        const COMMANDS = fs.readdirSync(global.shelly.mainPath + '/MIKU/COMMANDS').filter(COMMAND => COMMAND.endsWith('.js'));
 	for (let COMMAND of COMMANDS) {
 		try {
-			var module = require(global.shelly.mainPath + '/SHELLY/COMMANDS/' + COMMAND);
+			var module = require(global.shelly.mainPath + '/MIKU/COMMANDS/' + COMMAND);
 			if (!module.config || !module.onPick) throw new Error("Error in cmd format");
 			if (global.shelly.cmds.has(module.config.name || '')) throw new Error("Name Is Repeated " + module.config.name + " - " + COMMAND);
 			if (module.All) {
