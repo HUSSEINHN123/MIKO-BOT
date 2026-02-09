@@ -1,0 +1,35 @@
+{
+  "AD": [
+    "61576232405796",
+    "61576232405796",
+    "61576232405796",
+    "61576232405796"
+  ],
+  "Owner": "61576232405796",
+  "MAD": [
+    "value2"
+  ],
+  "THEME": {
+    "main": ["F40752","F5225C","F63E66","F75971","F7747B","F89085","F9AB8F"],
+    "text": ["F9AB8F","F99E77","F8905F","F88348","F87530","F76818","F75A00"]
+  },
+  "TID": "28761754306743093",
+  "PREFIX": "*",
+  "APPSTATEPATH": "CONFIGURATIONS/SCookies.json",
+  "BOTNAME": "miko",
+  "DeveloperMode": false,
+  "onlyme": false,
+  "FCAOption": {
+    "forceLogin": true,
+    "listenEvents": true,
+    "logLevel": "silent",
+    "selfListen": false,
+    "autoMarkRead": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 OPR/84.0.4316.21"
+  },
+  "DATABASE": {
+    "type": "mongodb",
+    "URI": "mongodb+srv://mynot1011_db_user:mohnoti3mk@noti.ntwxrts.mongodb.net/noti?retryWrites=true&w=majority"
+  },
+  "shellyID": "61576232405796"
+}
